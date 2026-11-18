@@ -104,6 +104,21 @@
   /* QR */
   .qr-out{margin-top:12px;text-align:center;display:none}
   .qr-out canvas{max-width:100%;height:auto;border:1px solid var(--line);border-radius:6px;image-rendering:pixelated}
+  /* Acortador de enlaces */
+  .ac-alias{display:flex;align-items:center;border:1px solid var(--field);border-radius:6px;background:#fff;overflow:hidden}
+  .ac-alias:focus-within{border-color:var(--brand-2);box-shadow:0 0 0 3px rgba(27,50,96,.15)}
+  .ac-alias span{padding:0 2px 0 10px;color:var(--muted);font-size:14px;white-space:nowrap}
+  .tool-body .ac-alias input{border:0;box-shadow:none;padding-left:2px;min-width:0}
+  .ac-out{display:none;margin-top:12px;padding:12px;border:1px solid var(--line);border-radius:6px;background:var(--band);text-align:center}
+  .ac-out a{font-size:18px;font-weight:600;color:var(--brand);word-break:break-all}
+  .ac-out .tbtns{justify-content:center}
+  .ac-hist{margin-top:12px;font-size:13px}
+  .ac-hist .h-title{font-weight:600;color:var(--brand);margin-bottom:4px}
+  .ac-hist .it{display:flex;align-items:center;gap:8px;padding:5px 0;border-top:1px dashed var(--line)}
+  .ac-hist .it div{flex:1;min-width:0}
+  .ac-hist .it a{color:var(--brand-2);font-weight:600}
+  .ac-hist .it small{display:block;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .ac-hist .it button{font:inherit;font-size:12px;border:1px solid var(--line);background:#fff;color:var(--brand);border-radius:6px;padding:4px 8px;cursor:pointer}
   /* Temporizador */
   .timer-display{font-variant-numeric:tabular-nums;font-size:46px;font-weight:600;text-align:center;color:var(--brand);margin:10px 0 4px;letter-spacing:.02em}
   .timer-display.fin{color:var(--red);animation:blink 1s steps(2) infinite}
@@ -192,6 +207,28 @@
               <button type="button" class="tbtn sec" id="qrCopiar">Copiar imagen</button>
             </div>
           </div>
+        </div>
+      </details>
+
+      <!-- Acortador de enlaces -->
+      <details class="tool">
+        <summary><span class="ico">🔗</span>Acortador de enlaces</summary>
+        <div class="tool-body">
+          <label for="acUrl">Enlace largo</label>
+          <input type="text" id="acUrl" inputmode="url" autocomplete="off" placeholder="https://docs.google.com/…">
+          <label for="acAlias">Nombre personalizado (opcional)</label>
+          <div class="ac-alias"><span>is.gd/</span><input type="text" id="acAlias" maxlength="30" autocomplete="off" placeholder="tarea5_3B"></div>
+          <div class="tnote">Entre 5 y 30 letras, números o guion bajo ( _ ). Sin acentos ni espacios.</div>
+          <div class="tbtns"><button type="button" class="tbtn" id="acAcortar">Acortar</button></div>
+          <div class="ac-out" id="acOut">
+            <a id="acLink" href="#" target="_blank" rel="noopener"></a>
+            <div class="tbtns">
+              <button type="button" class="tbtn sec" id="acCopiar">Copiar</button>
+              <button type="button" class="tbtn sec" id="acQR">▦ Ver código QR</button>
+            </div>
+          </div>
+          <div class="ac-hist" id="acHist"></div>
+          <div class="tnote">Usa el servicio gratuito is.gd: sin anuncios y el enlace lleva directo al destino. Los enlaces son permanentes: no se pueden editar ni borrar.</div>
         </div>
       </details>
 
@@ -2026,6 +2063,76 @@ return {QRCode:__m['index'],ECL:__m['QRErrorCorrectLevel']};})();
     g('cTabla').textContent = ver ? 'Ocultar tabla' : 'Ver tabla completa';
     if (ver) tabla();
   };
+
+  /* --- Acortador de enlaces (is.gd) --- */
+  function isgd(url, alias) {
+    return new Promise((ok, fail) => {
+      const cb = '__isgd' + Date.now() + Math.floor(Math.random() * 1000);
+      const s = document.createElement('script');
+      const t = setTimeout(() => { fin(); fail({ code: 0 }); }, 12000);
+      function fin() { clearTimeout(t); try { delete window[cb]; } catch (e) { window[cb] = undefined; } s.remove(); }
+      window[cb] = d => { fin(); (d && d.shorturl) ? ok(d.shorturl) : fail({ code: d && d.errorcode, msg: d && d.errormessage }); };
+      s.onerror = () => { fin(); fail({ code: 0 }); };
+      s.src = 'https://is.gd/create.php?format=json&logstats=0&callback=' + cb +
+        '&url=' + encodeURIComponent(url) + (alias ? '&shorturl=' + encodeURIComponent(alias) : '');
+      document.head.appendChild(s);
+    });
+  }
+  const acErrores = {
+    0: 'No hubo respuesta de is.gd. Revisa tu internet e inténtalo de nuevo.',
+    1: 'is.gd no aceptó ese enlace. Revisa que esté completo y bien escrito.',
+    2: 'Ese nombre personalizado ya está ocupado o no es válido. Prueba con otro.',
+    3: 'Demasiadas solicitudes seguidas. Espera un minuto y vuelve a intentar.',
+    4: 'is.gd no está disponible en este momento. Inténtalo más tarde.'
+  };
+  let acHist = [];
+  try { acHist = JSON.parse(ls.get('acortador-historial') || '[]'); } catch (e) { acHist = []; }
+  function acPintarHist() {
+    const box = g('acHist');
+    if (!acHist.length) { box.innerHTML = ''; return; }
+    box.innerHTML = '<div class="h-title">Tus últimos enlaces</div>';
+    acHist.forEach(h => {
+      const it = document.createElement('div'); it.className = 'it';
+      const info = document.createElement('div');
+      const a = document.createElement('a'); a.href = h.corto; a.target = '_blank'; a.rel = 'noopener'; a.textContent = h.corto.replace(/^https?:\/\//, '');
+      const sm = document.createElement('small'); sm.textContent = h.largo; sm.title = h.largo;
+      info.append(a, sm);
+      const b = document.createElement('button'); b.type = 'button'; b.textContent = 'Copiar'; b.onclick = () => copiar(h.corto);
+      it.append(info, b);
+      box.appendChild(it);
+    });
+  }
+  async function acortar() {
+    let url = g('acUrl').value.trim();
+    const alias = g('acAlias').value.trim();
+    if (!url) { toast('Pega el enlace que quieres acortar'); g('acUrl').focus(); return; }
+    if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(url)) url = 'https://' + url;
+    try { const u = new URL(url); if (!/^https?:$/.test(u.protocol) || !u.hostname.includes('.')) throw 0; }
+    catch (e) { toast('Ese enlace no parece válido'); g('acUrl').focus(); return; }
+    if (alias && !/^[A-Za-z0-9_]{5,30}$/.test(alias)) { toast('El nombre debe tener de 5 a 30 letras, números o _'); g('acAlias').focus(); return; }
+    const btn = g('acAcortar'); btn.disabled = true; btn.textContent = 'Acortando…';
+    try {
+      const corto = await isgd(url, alias);
+      g('acLink').href = corto; g('acLink').textContent = corto.replace(/^https?:\/\//, '');
+      g('acOut').style.display = 'block';
+      acHist = [{ corto, largo: url }].concat(acHist.filter(h => h.corto !== corto)).slice(0, 5);
+      ls.set('acortador-historial', JSON.stringify(acHist));
+      acPintarHist();
+      copiar(corto);
+    } catch (e) {
+      toast(acErrores[e && e.code] || ('No se pudo acortar' + (e && e.msg ? ': ' + e.msg : '')));
+    } finally { btn.disabled = false; btn.textContent = 'Acortar'; }
+  }
+  g('acAcortar').onclick = acortar;
+  ['acUrl', 'acAlias'].forEach(id => g(id).addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); acortar(); } }));
+  g('acCopiar').onclick = () => copiar(g('acLink').href);
+  g('acQR').onclick = () => {
+    g('qrTexto').value = g('acLink').href;
+    const qrTool = g('qrTexto').closest('details'); if (qrTool) qrTool.open = true;
+    generarQR();
+    g('qrOut').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  };
+  acPintarHist();
 
   /* --- Contador y formato de texto --- */
   const tx = g('txTexto');
