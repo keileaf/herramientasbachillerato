@@ -271,7 +271,7 @@ const HELPER = 'http://localhost:8765';
   }
 
   // ---------- Pinyin y furigana ----------
-  let pinyinP = null, kuroP = null;
+  let pinyinP = null;
   function loadPinyin() {
     if (!pinyinP) pinyinP = (async () => {
       try { await loadScript('https://unpkg.com/pinyin-pro@3'); }
@@ -281,36 +281,82 @@ const HELPER = 'http://localhost:8765';
     })().catch(e => { pinyinP = null; throw e; });
     return pinyinP;
   }
-  function loadKuro() {
-    if (!kuroP) kuroP = (async () => {
-      setStatus('Cargando diccionario japonés para furigana (solo tarda la primera vez)…');
-      await loadScript('https://cdn.jsdelivr.net/npm/kuroshiro@1.2.0/dist/kuroshiro.min.js');
-      await loadScript('https://cdn.jsdelivr.net/npm/kuroshiro-analyzer-kuromoji@1.1.0/dist/kuroshiro-analyzer-kuromoji.min.js');
-      const K = window.Kuroshiro.default || window.Kuroshiro;
-      const A = window.KuromojiAnalyzer.default || window.KuromojiAnalyzer;
-      const k = new K();
-      await k.init(new A({ dictPath: 'https://cdn.jsdelivr.net/npm/kuromoji@0.1.2/dict/' }));
-      setStatus(state.running ? 'Escuchando…' : 'Furigana listo.');
-      return k;
-    })().catch(e => { kuroP = null; setStatus('No se pudo cargar el furigana. Se mostrará la lectura en romaji.', true); throw e; });
-    return kuroP;
+
+  // Furigana: el diccionario japonés (~17 MB) se carga y procesa en un hilo aparte
+  // (Web Worker) para que la página nunca se congele. Mientras carga, los subtítulos
+  // siguen saliendo normalmente (con lectura en romaji).
+  const JA = { worker: null, ready: false, failed: false, seq: 0, pending: new Map() };
+  const JA_WORKER_SRC = `
+    self.window = self; self.global = self;
+    let k = null;
+    (async () => {
+      try {
+        importScripts('https://cdn.jsdelivr.net/npm/kuroshiro@1.2.0/dist/kuroshiro.min.js',
+                      'https://cdn.jsdelivr.net/npm/kuroshiro-analyzer-kuromoji@1.1.0/dist/kuroshiro-analyzer-kuromoji.min.js');
+        const K = self.Kuroshiro.default || self.Kuroshiro;
+        const A = self.KuromojiAnalyzer.default || self.KuromojiAnalyzer;
+        const inst = new K();
+        await inst.init(new A({ dictPath: 'https://cdn.jsdelivr.net/npm/kuromoji@0.1.2/dict/' }));
+        k = inst;
+        postMessage({ type: 'ready' });
+      } catch (e) { postMessage({ type: 'fail', error: String(e && e.message || e) }); }
+    })();
+    onmessage = async e => {
+      const { id, text, html } = e.data;
+      try {
+        postMessage({ id, html: await k.convert(html, { mode: 'furigana', to: 'hiragana' }),
+                          reading: await k.convert(text, { to: 'hiragana' }) });
+      } catch (err) { postMessage({ id, error: String(err) }); }
+    };`;
+  function jaFail() {
+    JA.failed = true; JA.ready = false;
+    try { JA.worker && JA.worker.terminate(); } catch (e) {}
+    JA.worker = null;
+    JA.pending.forEach(res => res(null)); JA.pending.clear();
+    setStatus('No se pudo cargar el furigana. Se muestra la lectura en romaji.', true);
+  }
+  function startJa() {
+    if (JA.worker || JA.failed || !window.Worker) return;
+    try {
+      JA.worker = new Worker(URL.createObjectURL(new Blob([JA_WORKER_SRC], { type: 'text/javascript' })));
+    } catch (e) { jaFail(); return; }
+    setStatus('Cargando furigana en segundo plano (la primera vez tarda un poco). Los subtítulos siguen funcionando.');
+    JA.worker.onerror = () => jaFail();
+    JA.worker.onmessage = e => {
+      const d = e.data;
+      if (d.type === 'ready') { JA.ready = true; setStatus(state.running ? 'Escuchando… (furigana listo)' : 'Furigana listo.'); return; }
+      if (d.type === 'fail') { jaFail(); return; }
+      const res = JA.pending.get(d.id);
+      if (res) { JA.pending.delete(d.id); res(d.error ? null : d); }
+    };
+  }
+  function furigana(text) {
+    if (!JA.ready || !JA.worker) return Promise.resolve(null);
+    return new Promise(res => {
+      const id = ++JA.seq;
+      JA.pending.set(id, res);
+      JA.worker.postMessage({ id, text, html: esc(text) });
+      setTimeout(() => { if (JA.pending.has(id)) { JA.pending.delete(id); res(null); } }, 3000);
+    });
   }
   function preloadFor(keys) {
     if (keys.includes('zh')) loadPinyin().catch(() => {});
-    if (keys.includes('ja')) loadKuro().catch(() => {});
+    if (keys.includes('ja')) startJa();
   }
   async function decorate(text, key) {
     const plain = { html: esc(text), reading: '' };
     if (!text || !hasReading(key)) return plain;
     try {
       if (key === 'zh') {
-        const P = await loadPinyin();
+        const P = await Promise.race([loadPinyin(), sleep(1500).then(() => null)]);
+        if (!P) return plain;   // si el pinyin tarda, no detiene los subtítulos
         const html = typeof P.html === 'function' ? P.html(esc(text))
           : [...text].map(ch => /\p{Script=Han}/u.test(ch) ? '<ruby>' + ch + '<rp>(</rp><rt>' + P.pinyin(ch) + '</rt><rp>)</rp></ruby>' : esc(ch)).join('');
         return { html, reading: P.pinyin(text) };
       }
-      const K = await loadKuro();
-      return { html: await K.convert(esc(text), { mode: 'furigana', to: 'hiragana' }), reading: await K.convert(text, { to: 'hiragana' }) };
+      startJa();
+      const r = await furigana(text);   // null si aún no está listo: no se espera
+      return r ? { html: r.html, reading: r.reading } : plain;
     } catch (e) { return plain; }
   }
 
