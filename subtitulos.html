@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Subtítulos en vivo · Colegio La Paz</title>
+<link rel="icon" href="logo.png">
+<style>
+  :root{
+    --ink:#1f2a3c; --muted:#5d6b82; --line:#dde3ea; --field:#c3ccd8; --bg:#f3f5f7; --band:#e9eef3; --card:#ffffff;
+    --brand:#1b3260; --brand-2:#2a4c8a; --red:#c8102e; --accent:#c9822b; --ok:#2e7d4f; --err:#b3261e;
+    --radius:10px; --serif:Georgia,"Times New Roman",serif;
+  }
+  *{box-sizing:border-box}
+  [hidden]{display:none!important}
+  body{margin:0;font-family:"Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif;color:var(--ink);background:var(--bg);line-height:1.5}
+  .wrap{max-width:1200px;margin:0 auto;padding:0 20px}
+  .site-header{background:#fff;border-bottom:3px solid var(--red)}
+  .site-header .wrap{display:flex;align-items:center;gap:36px;min-height:88px}
+  .site-header img{height:66px;width:auto;display:block}
+  .site-header .titulo{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--brand);line-height:1.6}
+  .band{background:var(--band);font-size:14px;color:var(--brand);padding:12px 0}
+  .band .wrap{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+  .band a{color:var(--brand-2)}
+  @media (max-width:600px){.site-header .wrap{gap:18px;min-height:72px}.site-header img{height:50px}.site-header .titulo{font-size:11px}}
+  main{padding:24px 0 50px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:0 1px 3px rgba(31,42,60,.05);padding:18px 20px;margin-bottom:16px}
+  h1{font-family:var(--serif);font-weight:400;color:var(--brand);font-size:clamp(26px,4vw,32px);line-height:1.2;margin:0 0 4px}
+  .intro{color:var(--muted);font-size:14px;margin:0 0 16px}
+  label.lbl{display:block;font-weight:600;font-size:12.5px;margin-bottom:5px;color:var(--brand)}
+  select,input[type=range]{font:inherit}
+  select{width:100%;font-size:14px;color:inherit;padding:9px 10px;border:1px solid var(--field);border-radius:6px;background:#fff}
+  select:focus{outline:none;border-color:var(--brand-2);box-shadow:0 0 0 3px rgba(27,50,96,.15)}
+  input[type=range]{width:100%;accent-color:var(--brand)}
+  .btn{font:inherit;font-weight:600;font-size:15px;padding:11px 18px;border:1px solid var(--brand);border-radius:6px;background:var(--brand);color:#fff;cursor:pointer;transition:.15s;white-space:nowrap}
+  .btn:hover{background:var(--brand-2)}
+  .btn.sec{background:#fff;color:var(--brand);border-color:var(--line)}
+  .btn.sec:hover{border-color:var(--brand)}
+  .btn.rec{background:var(--red);border-color:var(--red)}
+  .btn.on{background:#e3f2e8;color:var(--ok);border-color:var(--ok)}
+  .btn.sm{font-size:13.5px;padding:8px 12px;font-weight:500}
+
+  .row{display:grid;gap:14px;align-items:end}
+  .row.main{grid-template-columns:auto 1fr auto 1fr 1fr}
+  .row.opts{grid-template-columns:repeat(4,minmax(0,1fr)) auto;margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}
+  @media (max-width:860px){.row.main,.row.opts{grid-template-columns:1fr 1fr}.row.main .btn{grid-column:1/-1}}
+  .checks{display:flex;flex-direction:column;gap:2px;font-size:13.5px}
+  .checks label{display:flex;gap:6px;align-items:center;cursor:pointer}
+  .status-line{display:flex;align-items:center;gap:10px;font-size:13.5px;color:var(--muted);margin-top:12px;min-height:22px}
+  .status-line.err{color:var(--err)}
+  .dot{width:10px;height:10px;border-radius:50%;background:var(--field);display:inline-block;flex:none}
+  .dot.live{background:var(--red);animation:pulse 1.4s infinite}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(200,16,46,.6)}70%{box-shadow:0 0 0 10px rgba(200,16,46,0)}100%{box-shadow:0 0 0 0 rgba(200,16,46,0)}}
+  .chip{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;padding:3px 10px;border-radius:999px;background:var(--band);color:var(--muted);white-space:nowrap}
+  .chip.ok{background:#e3f2e8;color:var(--ok)} .chip.bad{background:#fbe9e7;color:var(--err)}
+
+  .float-card{display:grid;grid-template-columns:auto 1fr 1fr auto;gap:16px;align-items:end}
+  .float-card h3{margin:0;font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--brand)}
+  @media (max-width:860px){.float-card{grid-template-columns:1fr 1fr}}
+
+  /* Escenario de subtítulos */
+  .stage-wrap{position:relative}
+  #stage{background:var(--brand);border-radius:var(--radius);min-height:52vh;display:flex;align-items:flex-end;padding:28px 32px;overflow:hidden}
+  #stage:fullscreen{border-radius:0;min-height:100vh;padding:40px 56px}
+  .stage-tools{position:absolute;top:10px;right:10px;display:flex;gap:6px}
+  .stage-tools button{font:inherit;font-size:13px;border:0;border-radius:6px;padding:6px 10px;background:rgba(255,255,255,.15);color:#fff;cursor:pointer}
+  .stage-tools button:hover{background:rgba(255,255,255,.28)}
+  #subs{width:100%;font-size:44px;line-height:1.3;font-family:"Segoe UI","Malgun Gothic","Microsoft YaHei","Yu Gothic UI","Meiryo",system-ui,sans-serif}
+  #subs .line{margin:.3em 0}
+  #subs .orig{font-size:.55em;color:#c9d4e6}
+  #subs .trans{font-weight:600;color:#fff;line-height:1.65}
+  #subs .reading{font-size:.45em;color:#ffd28a}
+  #subs rt{font-size:.45em;color:#ffd28a;font-weight:400}
+  #subs .orig rt{font-size:.6em}
+  #subs .line.interim{opacity:.6}
+  #subs .empty{color:#c9d4e6;font-size:.5em}
+  #subs.hide-orig .orig{display:none}
+  #subs.no-ruby rt,#subs.no-ruby rp,#subs.no-ruby .reading{display:none}
+  #stage.light{background:#fff;border:1px solid var(--line)}
+  #stage.light #subs .trans{color:var(--brand)} #stage.light #subs .orig,#stage.light #subs .empty{color:var(--muted)}
+  #stage.light #subs rt,#stage.light #subs .reading{color:var(--accent)}
+  #stage.light .stage-tools button{background:var(--band);color:var(--brand)}
+  #stage.green{background:#00b140}
+  #stage.green #subs .trans,#stage.green #subs .orig{text-shadow:0 2px 4px #000}
+  body.pip{margin:0;padding:12px 18px;display:flex;align-items:flex-end;height:100vh;overflow:hidden;background:var(--brand)}
+
+  details.hist{margin-top:16px}
+  details.hist summary{cursor:pointer;font-weight:600;color:var(--brand);font-size:14px}
+  #histList{max-height:300px;overflow:auto;margin-top:10px;font-size:14px}
+  #histList .h{padding:7px 0;border-bottom:1px dashed var(--line)}
+  #histList .h small{color:var(--muted);display:block}
+  #histList .h .rd{color:var(--accent);font-size:12.5px;display:block}
+
+  /* Ventana de instalación */
+  .modal-bg{position:fixed;inset:0;background:rgba(20,30,50,.5);display:flex;align-items:center;justify-content:center;z-index:1000;padding:16px}
+  .modal{background:#fff;border-radius:var(--radius);max-width:560px;width:100%;padding:24px 26px;box-shadow:0 20px 50px rgba(0,0,0,.25)}
+  .modal h2{font-family:var(--serif);font-weight:400;color:var(--brand);margin:0 0 8px;font-size:26px}
+  .modal p{font-size:14px;color:var(--muted);margin:0 0 12px}
+  .modal ol{font-size:14px;padding-left:20px;margin:0 0 16px}
+  .modal li{margin-bottom:6px}
+  .modal .tbtns{display:flex;gap:8px;flex-wrap:wrap}
+  .modal .note{font-size:12.5px;color:var(--muted);margin-top:14px;border-top:1px solid var(--line);padding-top:10px}
+  footer{text-align:center;color:var(--muted);font-size:13px;margin-top:24px}
+</style>
+</head>
+<body>
+<header class="site-header">
+  <div class="wrap">
+    <img src="logo.png" alt="Colegio La Paz">
+    <div class="titulo">Herramientas para el aula<br>Subtítulos en vivo</div>
+  </div>
+</header>
+<div class="band"><div class="wrap">
+  <span>Tu voz, traducida en vivo para alumnos que hablan otro idioma.</span>
+  <a href="index.html">← Volver a peticiones</a>
+</div></div>
+
+<main>
+  <div class="wrap">
+    <div class="card">
+      <h1>Subtítulos en vivo</h1>
+      <p class="intro">Funciona en <b>Google Chrome</b> o <b>Microsoft Edge</b>. La primera vez, al iniciar, elige <b>“Permitir al visitar el sitio”</b> para el micrófono y no te lo volverá a pedir.</p>
+
+      <div class="row main">
+        <button class="btn" id="btnStart">▶ Iniciar</button>
+        <div><label class="lbl" for="srcLang">Escucho</label><select id="srcLang"></select></div>
+        <button class="btn sec" id="btnSwap" title="Invertir idiomas">⇄</button>
+        <div><label class="lbl" for="tgtLang">Traduzco a</label><select id="tgtLang"></select></div>
+        <div><label class="lbl" for="engine">Motor de traducción</label>
+          <select id="engine">
+            <option value="auto" selected>Automático</option>
+            <option value="google">Google (en línea)</option>
+            <option value="builtin">Integrado del navegador</option>
+          </select></div>
+      </div>
+
+      <div class="row opts">
+        <div><label class="lbl" for="fontSize">Tamaño de letra</label><input type="range" id="fontSize" min="20" max="110" value="44"></div>
+        <div><label class="lbl" for="lines">Líneas visibles</label>
+          <select id="lines"><option>1</option><option selected>2</option><option>3</option><option>4</option></select></div>
+        <div><label class="lbl" for="theme">Fondo de la pantalla</label>
+          <select id="theme"><option value="navy">Azul colegio</option><option value="light">Blanco</option><option value="green">Pantalla verde</option></select></div>
+        <div class="checks">
+          <label><input type="checkbox" id="showOrig" checked> Mostrar original</label>
+          <label><input type="checkbox" id="showRuby" checked> Pinyin / furigana</label>
+          <label><input type="checkbox" id="liveTrans" checked> Traducir mientras hablo</label>
+        </div>
+        <div style="display:flex;gap:6px">
+          <button class="btn sec sm" id="btnSave" title="Descargar la clase">💾 Guardar</button>
+          <button class="btn sec sm" id="btnClear" title="Borrar">🗑</button>
+        </div>
+      </div>
+
+      <div class="status-line" id="statusLine"><span class="dot" id="dot"></span><span id="status">Listo. Presiona Iniciar (o la barra espaciadora).</span><span class="chip" id="micState" hidden></span></div>
+    </div>
+
+    <div class="card float-card">
+      <div>
+        <h3>Barra flotante</h3>
+        <div style="margin-top:6px"><span class="chip" id="helperChip">Ayudante: sin revisar</span></div>
+      </div>
+      <div><label class="lbl" for="ovBg">Fondo de la barra: <span id="ovBgVal">45%</span></label><input type="range" id="ovBg" min="0" max="100" value="45" title="0% = solo letras"></div>
+      <div><label class="lbl" for="ovFont">Letra de la barra</label><input type="range" id="ovFont" min="16" max="90" value="38"></div>
+      <button class="btn" id="btnFloat" title="Barra transparente encima de PowerPoint, Word, etc.">🗔 Abrir barra flotante</button>
+    </div>
+
+    <div class="stage-wrap">
+      <div id="stage">
+        <div class="stage-tools"><button id="btnFull" title="Pantalla completa">⛶ Proyectar</button></div>
+        <div id="subs"><div class="empty">Los subtítulos aparecerán aquí…</div></div>
+      </div>
+    </div>
+
+    <details class="hist card">
+      <summary>Historial de la clase</summary>
+      <div id="histList"></div>
+    </details>
+
+    <footer>Colegio La Paz · El audio lo reconoce el navegador y el texto se traduce en línea. No se guarda nada en la hoja de cálculo.</footer>
+  </div>
+</main>
+
+<div class="modal-bg" id="modal" hidden>
+  <div class="modal" role="dialog" aria-labelledby="mTitle">
+    <h2 id="mTitle">Instalar la barra transparente</h2>
+    <p>Para que los subtítulos floten <b>transparentes encima de PowerPoint o Word</b>, esta computadora necesita un pequeño ayudante de Windows. Se instala <b>una sola vez</b> y queda en <b>Documentos › Subtitulos en vivo</b>.</p>
+    <ol>
+      <li>Descarga el ayudante con el botón de abajo.</li>
+      <li>Abre el .zip, elige <b>“Extraer todo”</b> y abre <b>instalar.bat</b>. Si Windows avisa “protegió su PC”, elige <i>Más información → Ejecutar de todas formas</i>.</li>
+      <li>Regresa aquí y presiona <b>“Ya lo instalé”</b>. Si el navegador pregunta si quiere <b>abrir Subtitulos</b> o <b>acceder a la red local</b>, acepta y marca “recordar”.</li>
+    </ol>
+    <div class="tbtns">
+      <a class="btn" id="mDownload" href="#" target="_blank" rel="noopener" style="text-decoration:none">⬇ Descargar ayudante</a>
+      <button class="btn sec" id="mRetry">Ya lo instalé</button>
+      <button class="btn sec" id="mPip">Usar ventana sin transparencia</button>
+      <button class="btn sec" id="mClose">Cerrar</button>
+    </div>
+    <div class="note" id="mNote">Solo funciona en computadoras con Windows. En otras, usa “Proyectar” o la ventana sin transparencia.</div>
+  </div>
+</div>
+
+<script>
+/* ========= CONFIGURACIÓN =========
+   Por defecto el ayudante se descarga del archivo Subtitulos_ayudante.zip
+   que está junto a esta página (súbelo a GitHub en la misma carpeta).
+   Si prefieres Google Drive, pega aquí el enlace (compartido como
+   "Cualquier persona con el enlace"). */
+const DRIVE_URL = '';
+const DESCARGA_URL = DRIVE_URL || 'Subtitulos_ayudante.zip';
+const HELPER = 'http://localhost:8765';
+/* ================================= */
+
+(() => {
+  const $ = id => document.getElementById(id);
+  const subsEl = $('subs');
+  const stageEl = $('stage');
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+  // ---------- Idiomas ----------
+  const LANGS = {
+    'es-MX': { name: 'Español (México)', short: 'Español', rec: 'es-MX', tr: 'es' },
+    'es-ES': { name: 'Español (España)', rec: 'es-ES', tr: 'es' },
+    'ko':    { name: 'Coreano 한국어', rec: 'ko-KR', tr: 'ko' },
+    'zh':    { name: 'Chino mandarín 中文', rec: 'zh-CN', tr: 'zh-CN', bi: 'zh' },
+    'ja':    { name: 'Japonés 日本語', rec: 'ja-JP', tr: 'ja' },
+    'en':    { name: 'Inglés', rec: 'en-US', tr: 'en' },
+  };
+  const SRC_KEYS = ['es-MX', 'es-ES', 'ko', 'zh', 'ja', 'en'];
+  const TGT_KEYS = ['ko', 'zh', 'ja', 'es-MX', 'en'];
+  SRC_KEYS.forEach(k => $('srcLang').add(new Option(LANGS[k].name, k)));
+  TGT_KEYS.forEach(k => $('tgtLang').add(new Option(LANGS[k].short || LANGS[k].name, k)));
+  $('srcLang').value = 'es-MX'; $('tgtLang').value = 'ko';
+  const srcKey = () => $('srcLang').value;
+  const tgtKey = () => $('tgtLang').value;
+  const trCode = k => LANGS[k].tr;
+  const biCode = k => LANGS[k].bi || LANGS[k].tr;
+  const hasReading = k => k === 'zh' || k === 'ja';
+
+  const state = { running: false, rec: null, lines: [], interim: { orig: '' }, interimSeq: 0, interimTimer: null, builtin: {}, builtinPending: {} };
+
+  // ---------- Preferencias ----------
+  const PREFS = ['srcLang', 'tgtLang', 'engine', 'fontSize', 'lines', 'theme', 'ovBg', 'ovFont'];
+  const CHECKS = ['showOrig', 'showRuby', 'liveTrans'];
+  let prefs = {};
+  try {
+    prefs = JSON.parse(localStorage.getItem('subs-prefs-lapaz') || '{}');
+    PREFS.forEach(k => { if (prefs[k] == null) return; const b = $(k).value; $(k).value = prefs[k]; if ($(k).value === '') $(k).value = b; });
+    CHECKS.forEach(k => { if (prefs[k] != null) $(k).checked = prefs[k]; });
+  } catch (e) {}
+  function savePrefs() {
+    try {
+      PREFS.forEach(k => prefs[k] = $(k).value);
+      CHECKS.forEach(k => prefs[k] = $(k).checked);
+      localStorage.setItem('subs-prefs-lapaz', JSON.stringify(prefs));
+    } catch (e) {}
+  }
+
+  // ---------- Utilidades ----------
+  function setStatus(msg, isErr) { $('status').innerHTML = msg; $('statusLine').classList.toggle('err', !!isErr); }
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const hhmmss = d => d.toTimeString().slice(0, 8);
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const loaded = {};
+  function loadScript(url) {
+    if (!loaded[url]) loaded[url] = new Promise((ok, fail) => {
+      const s = document.createElement('script');
+      s.src = url; s.onload = ok; s.onerror = () => { delete loaded[url]; fail(new Error(url)); };
+      document.head.appendChild(s);
+    });
+    return loaded[url];
+  }
+
+  // ---------- Pinyin y furigana ----------
+  let pinyinP = null, kuroP = null;
+  function loadPinyin() {
+    if (!pinyinP) pinyinP = (async () => {
+      try { await loadScript('https://unpkg.com/pinyin-pro@3'); }
+      catch (e) { await loadScript('https://cdn.jsdelivr.net/npm/pinyin-pro@3/dist/index.js'); }
+      if (!window.pinyinPro) throw new Error('pinyin');
+      return window.pinyinPro;
+    })().catch(e => { pinyinP = null; throw e; });
+    return pinyinP;
+  }
+  function loadKuro() {
+    if (!kuroP) kuroP = (async () => {
+      setStatus('Cargando diccionario japonés para furigana (solo tarda la primera vez)…');
+      await loadScript('https://cdn.jsdelivr.net/npm/kuroshiro@1.2.0/dist/kuroshiro.min.js');
+      await loadScript('https://cdn.jsdelivr.net/npm/kuroshiro-analyzer-kuromoji@1.1.0/dist/kuroshiro-analyzer-kuromoji.min.js');
+      const K = window.Kuroshiro.default || window.Kuroshiro;
+      const A = window.KuromojiAnalyzer.default || window.KuromojiAnalyzer;
+      const k = new K();
+      await k.init(new A({ dictPath: 'https://cdn.jsdelivr.net/npm/kuromoji@0.1.2/dict/' }));
+      setStatus(state.running ? 'Escuchando…' : 'Furigana listo.');
+      return k;
+    })().catch(e => { kuroP = null; setStatus('No se pudo cargar el furigana. Se mostrará la lectura en romaji.', true); throw e; });
+    return kuroP;
+  }
+  function preloadFor(keys) {
+    if (keys.includes('zh')) loadPinyin().catch(() => {});
+    if (keys.includes('ja')) loadKuro().catch(() => {});
+  }
+  async function decorate(text, key) {
+    const plain = { html: esc(text), reading: '' };
+    if (!text || !hasReading(key)) return plain;
+    try {
+      if (key === 'zh') {
+        const P = await loadPinyin();
+        const html = typeof P.html === 'function' ? P.html(esc(text))
+          : [...text].map(ch => /\p{Script=Han}/u.test(ch) ? '<ruby>' + ch + '<rp>(</rp><rt>' + P.pinyin(ch) + '</rt><rp>)</rp></ruby>' : esc(ch)).join('');
+        return { html, reading: P.pinyin(text) };
+      }
+      const K = await loadKuro();
+      return { html: await K.convert(esc(text), { mode: 'furigana', to: 'hiragana' }), reading: await K.convert(text, { to: 'hiragana' }) };
+    } catch (e) { return plain; }
+  }
+
+  // ---------- Traducción ----------
+  async function translateGoogle(text, sl, tl) {
+    const url = 'https://translate.googleapis.com/translate_a/single?client=gtx&dt=t&dt=rm&sl=' + sl + '&tl=' + tl + '&q=' + encodeURIComponent(text);
+    const r = await fetch(url);
+    if (!r.ok) throw new Error('Google ' + r.status);
+    const segs = (await r.json())[0] || [];
+    const rm = segs.find(s => s[0] == null && s[2]);
+    return { text: segs.filter(s => s[0] != null).map(s => s[0]).join(''), translit: rm ? rm[2] : '' };
+  }
+  async function translateMyMemory(text, sl, tl) {
+    const d = await (await fetch('https://api.mymemory.translated.net/get?q=' + encodeURIComponent(text) + '&langpair=' + sl + '|' + tl)).json();
+    return { text: d.responseData.translatedText, translit: '' };
+  }
+  async function getBuiltin(sk, tk, mayCreate) {
+    const sl = biCode(sk), tl = biCode(tk), key = sl + '>' + tl;
+    if (state.builtin[key]) return state.builtin[key];
+    if (!('Translator' in self) || state.builtinPending[key] || !mayCreate) return null;
+    try {
+      if (await Translator.availability({ sourceLanguage: sl, targetLanguage: tl }) === 'unavailable') return null;
+      state.builtinPending[key] = true;
+      Translator.create({ sourceLanguage: sl, targetLanguage: tl }).then(t => { state.builtin[key] = t; }).finally(() => { state.builtinPending[key] = false; });
+    } catch (e) {}
+    return null;
+  }
+  async function translate(text, sk, tk) {
+    if (!text.trim()) return { text: '', translit: '' };
+    if (trCode(sk) === trCode(tk)) return { text, translit: '' };
+    const engine = $('engine').value;
+    if (engine === 'builtin' || (engine === 'auto' && !hasReading(tk))) {
+      const t = await getBuiltin(sk, tk, false);
+      if (t) { try { return { text: await t.translate(text), translit: '' }; } catch (e) {} }
+    }
+    try { return await translateGoogle(text, trCode(sk), trCode(tk)); }
+    catch (e) {
+      try { return await translateMyMemory(text, trCode(sk), trCode(tk)); }
+      catch (e2) { setStatus('No se pudo traducir (¿hay internet?).', true); return { text: '…', translit: '' }; }
+    }
+  }
+
+  // ---------- Pantalla ----------
+  function visibleItems() {
+    const n = parseInt($('lines').value, 10);
+    const items = state.lines.slice(-n).map(l => ({ ...l, interim: false }));
+    if (state.interim.orig) { items.push({ ...state.interim, interim: true }); if (items.length > n) items.shift(); }
+    return items;
+  }
+  function render() {
+    const items = visibleItems();
+    subsEl.innerHTML = !items.length ? '<div class="empty">Los subtítulos aparecerán aquí…</div>' : items.map(l => {
+      const th = l.transHTML || esc(l.trans || '');
+      return '<div class="line' + (l.interim ? ' interim' : '') + '">' +
+        '<div class="orig">' + (l.origHTML || esc(l.orig)) + '</div>' +
+        '<div class="trans">' + th + '</div>' +
+        (l.reading && !th.includes('<rt') ? '<div class="reading">' + esc(l.reading) + '</div>' : '') + '</div>';
+    }).join('');
+    pushOverlay();
+  }
+  function addHistory(l) {
+    const div = document.createElement('div');
+    div.className = 'h';
+    div.innerHTML = '<small>' + l.time + ' · ' + esc(l.orig) + '</small>' + esc(l.trans) + (l.reading ? '<span class="rd">' + esc(l.reading) + '</span>' : '');
+    $('histList').appendChild(div);
+    $('histList').scrollTop = 1e9;
+  }
+  function applyView() {
+    subsEl.style.fontSize = (pipWin ? $('ovFont').value : $('fontSize').value) + 'px';
+    subsEl.classList.toggle('hide-orig', !$('showOrig').checked);
+    subsEl.classList.toggle('no-ruby', !$('showRuby').checked);
+    stageEl.classList.remove('light', 'green');
+    if ($('theme').value !== 'navy') stageEl.classList.add($('theme').value);
+    $('ovBgVal').textContent = $('ovBg').value + '%';
+    if (pipWin) pipWin.document.body.style.background = 'rgba(27,50,96,' + ($('ovBg').value / 100) + ')';
+    render();
+    savePrefs();
+  }
+
+  // ---------- Reconocimiento de voz ----------
+  async function onFinal(text) {
+    text = text.trim();
+    if (!text) return;
+    clearTimeout(state.interimTimer);
+    state.interimSeq++;
+    const sk = srcKey(), tk = tgtKey();
+    const line = { time: hhmmss(new Date()), orig: text, trans: '…' };
+    state.lines.push(line);
+    state.interim = { orig: '' };
+    render();
+    const [o, r] = await Promise.all([decorate(text, sk), translate(text, sk, tk)]);
+    line.origHTML = o.html;
+    line.trans = r.text;
+    const d = await decorate(r.text, tk);
+    line.transHTML = d.html;
+    line.reading = hasReading(tk) ? (d.reading || r.translit || '') : '';
+    render();
+    addHistory(line);
+  }
+  function onInterim(text) {
+    state.interim.orig = text;
+    render();
+    if (!$('liveTrans').checked) return;
+    clearTimeout(state.interimTimer);
+    const seq = ++state.interimSeq;
+    state.interimTimer = setTimeout(async () => {
+      const sk = srcKey(), tk = tgtKey();
+      const r = await translate(text, sk, tk);
+      const d = await decorate(r.text, tk);
+      if (seq !== state.interimSeq) return;
+      Object.assign(state.interim, { trans: r.text, transHTML: d.html, reading: hasReading(tk) ? (d.reading || r.translit || '') : '' });
+      render();
+    }, 600);
+  }
+  function buildRecognizer() {
+    const rec = new SR();
+    rec.lang = LANGS[srcKey()].rec;
+    rec.continuous = true;
+    rec.interimResults = true;
+    rec.onstart = () => { $('dot').classList.add('live'); setStatus('Escuchando en <b>' + LANGS[srcKey()].name + '</b> → <b>' + LANGS[tgtKey()].name + '</b>'); };
+    rec.onresult = e => {
+      let interim = '';
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const r = e.results[i];
+        if (r.isFinal) onFinal(r[0].transcript); else interim += r[0].transcript;
+      }
+      if (interim) onInterim(interim);
+    };
+    rec.onerror = e => {
+      const msgs = {
+        'not-allowed': 'El navegador bloqueó el micrófono. Haz clic en el ícono junto a la dirección y elige “Permitir”.',
+        'service-not-allowed': 'El reconocimiento de voz no está permitido. Usa Chrome o Edge.',
+        'audio-capture': 'No se encontró micrófono. Revisa el micrófono predeterminado de Windows (Configuración → Sistema → Sonido).',
+        'network': 'Sin conexión con el servicio de voz. Revisa tu internet.',
+        'language-not-supported': 'Este navegador no reconoce voz en ese idioma.',
+      };
+      if (e.error === 'no-speech' || e.error === 'aborted') return;
+      setStatus(msgs[e.error] || ('Error: ' + e.error), true);
+      if (['not-allowed', 'service-not-allowed', 'audio-capture', 'language-not-supported'].includes(e.error)) stop();
+    };
+    rec.onend = () => {
+      if (state.running) { try { rec.start(); } catch (e) { setTimeout(() => { if (state.running) try { rec.start(); } catch (e2) {} }, 300); } }
+      else $('dot').classList.remove('live');
+    };
+    return rec;
+  }
+  function start() {
+    if (!SR) { setStatus('Este navegador no reconoce voz. Abre la página en <b>Google Chrome</b> o <b>Microsoft Edge</b>.', true); return; }
+    if ($('engine').value !== 'google') getBuiltin(srcKey(), tgtKey(), true);
+    preloadFor([srcKey(), tgtKey()]);
+    state.running = true;
+    state.rec = buildRecognizer();
+    try { state.rec.start(); } catch (e) {}
+    $('btnStart').textContent = '■ Detener';
+    $('btnStart').classList.add('rec');
+  }
+  function stop() {
+    state.running = false;
+    if (state.rec) { try { state.rec.stop(); } catch (e) {} }
+    $('dot').classList.remove('live');
+    $('btnStart').textContent = '▶ Iniciar';
+    $('btnStart').classList.remove('rec');
+    if (state.interim.orig) onFinal(state.interim.orig);
+    setStatus('Detenido.');
+  }
+  function onLangChange() {
+    savePrefs();
+    preloadFor([srcKey(), tgtKey()]);
+    if ($('engine').value !== 'google') getBuiltin(srcKey(), tgtKey(), true);
+    if (!state.running) return;
+    state.running = false;
+    try { state.rec.abort(); } catch (e) {}
+    setTimeout(start, 250);
+  }
+
+  (async () => {
+    try {
+      const p = await navigator.permissions.query({ name: 'microphone' });
+      const show = () => {
+        const m = { granted: ['🎙 Micrófono permitido', 'ok'], denied: ['🎙 Micrófono bloqueado', 'bad'], prompt: ['🎙 Pedirá permiso', ''] }[p.state];
+        if (!m) return;
+        $('micState').hidden = false; $('micState').textContent = m[0]; $('micState').className = 'chip ' + m[1];
+      };
+      show(); p.onchange = show;
+    } catch (e) {}
+  })();
+
+  // ---------- Ayudante de Windows (barra transparente) ----------
+  const helper = { available: false, on: false, poll: null };
+  let ovTimer = null;
+  function setChip(text, cls) { $('helperChip').textContent = text; $('helperChip').className = 'chip ' + (cls || ''); }
+  function setFloatLabel(on) {
+    $('btnFloat').textContent = on ? '🗔 Cerrar barra flotante' : '🗔 Abrir barra flotante';
+    $('btnFloat').classList.toggle('on', on);
+  }
+  function setOverlayOn(v) { helper.on = !!v; setFloatLabel(helper.on || !!pipWin); }
+  async function api(path, body) {
+    const ctl = new AbortController();
+    const t = setTimeout(() => ctl.abort(), 1500);
+    try {
+      const r = await fetch(HELPER + path, body === undefined
+        ? { signal: ctl.signal }
+        : { method: 'POST', body, headers: { 'Content-Type': 'text/plain' }, signal: ctl.signal });
+      return await r.json();
+    } finally { clearTimeout(t); }
+  }
+  async function ping() {
+    try { const j = await api('/api/ping'); return !!(j && j.overlay); } catch (e) { return false; }
+  }
+  function setAvailable(v) {
+    helper.available = v;
+    if (v) {
+      setChip('Ayudante: conectado ✓', 'ok');
+      try { localStorage.setItem('subs-helper-known', '1'); } catch (e) {}
+      if (!helper.poll) helper.poll = setInterval(async () => {
+        try { setOverlayOn((await api('/api/overlay/state')).visible); }
+        catch (e) { setAvailable(false); setOverlayOn(false); setChip('Ayudante: desconectado', 'bad'); }
+      }, 1200);
+    } else if (helper.poll) { clearInterval(helper.poll); helper.poll = null; }
+  }
+  function pushOverlay() {
+    if (!helper.on || ovTimer) return;
+    ovTimer = setTimeout(() => { ovTimer = null; sendOverlay(); }, 100);
+  }
+  async function sendOverlay() {
+    const payload = {
+      fs: +$('ovFont').value, bg: +$('ovBg').value, showOrig: $('showOrig').checked, showReading: $('showRuby').checked, center: true,
+      lines: visibleItems().map(l => ({ orig: l.orig || '', trans: l.trans || '', reading: l.reading || '', interim: !!l.interim })),
+    };
+    try { setOverlayOn((await api('/api/overlay', JSON.stringify(payload))).visible); } catch (e) {}
+  }
+  function launchHelper() {
+    // Abre el ayudante instalado mediante el enlace subtitulos://
+    const f = document.createElement('iframe');
+    f.style.display = 'none';
+    f.src = 'subtitulos://abrir';
+    document.body.appendChild(f);
+    setTimeout(() => f.remove(), 3000);
+  }
+  function helperKnown() { try { return localStorage.getItem('subs-helper-known') === '1'; } catch (e) { return false; } }
+  async function ensureHelper(tryLaunch) {
+    if (await ping()) { setAvailable(true); return true; }
+    // En una computadora donde nunca se instaló, no intentamos abrirlo (bloquearía la descarga)
+    if (!tryLaunch) { setChip('Ayudante: no instalado', 'bad'); return false; }
+    setChip('Abriendo ayudante…');
+    launchHelper();
+    for (let i = 0; i < 14; i++) {
+      await sleep(700);
+      if (await ping()) { setAvailable(true); return true; }
+    }
+    setChip('Ayudante: no instalado', 'bad');
+    return false;
+  }
+  async function toggleFloat(tryLaunch) {
+    if (tryLaunch !== true) tryLaunch = helperKnown();
+    if (pipWin) { pipWin.close(); return; }
+    if (helper.on) {
+      try { setOverlayOn((await api('/api/overlay/hide', '')).visible); } catch (e) { setOverlayOn(false); }
+      return;
+    }
+    $('btnFloat').disabled = true;
+    const ok = await ensureHelper(tryLaunch);
+    $('btnFloat').disabled = false;
+    if (!ok) { openModal(); return; }
+    try { setOverlayOn((await api('/api/overlay/show', '')).visible); sendOverlay(); }
+    catch (e) { setChip('Ayudante: desconectado', 'bad'); }
+  }
+
+  // ---------- Ventana de instalación ----------
+  function openModal() {
+    const dl = $('mDownload');
+    dl.href = DESCARGA_URL;
+    if (DRIVE_URL) { dl.removeAttribute('download'); dl.target = '_blank'; }
+    else { dl.setAttribute('download', 'Subtitulos_ayudante.zip'); dl.removeAttribute('target'); }
+    $('modal').hidden = false;
+  }
+  $('mClose').onclick = () => { $('modal').hidden = true; };
+  $('mRetry').onclick = async () => { $('modal').hidden = true; await toggleFloat(true); };
+  $('mPip').onclick = () => { $('modal').hidden = true; openPip(); };
+  $('modal').addEventListener('click', e => { if (e.target === $('modal')) $('modal').hidden = true; });
+
+  // ---------- Ventana del navegador (sin transparencia, respaldo) ----------
+  let pipWin = null;
+  async function openPip() {
+    if (!('documentPictureInPicture' in window)) { setStatus('Tu navegador no permite ventana flotante. Usa “Proyectar”.', true); return; }
+    try { pipWin = await documentPictureInPicture.requestWindow({ width: 960, height: 230 }); }
+    catch (e) { setStatus('No se pudo abrir la ventana: ' + e.message, true); return; }
+    [...document.styleSheets].forEach(ss => {
+      try { const st = pipWin.document.createElement('style'); st.textContent = [...ss.cssRules].map(r => r.cssText).join('\n'); pipWin.document.head.appendChild(st); } catch (e) {}
+    });
+    pipWin.document.body.className = 'pip';
+    pipWin.document.body.appendChild(subsEl);
+    setFloatLabel(true);
+    pipWin.addEventListener('pagehide', () => {
+      stageEl.appendChild(subsEl);
+      pipWin = null;
+      setFloatLabel(helper.on);
+      applyView();
+    });
+    applyView();
+  }
+
+  // ---------- Guardar ----------
+  function saveTranscript() {
+    if (!state.lines.length) { setStatus('Todavía no hay nada que guardar.'); return; }
+    const d = new Date();
+    const head = 'Colegio La Paz — Subtítulos de clase — ' + d.toLocaleString('es-MX') + '\n' + LANGS[srcKey()].name + ' → ' + LANGS[tgtKey()].name + '\n\n';
+    const body = state.lines.map(l => '[' + l.time + ']\n' + l.orig + '\n' + l.trans + '\n' + (l.reading ? l.reading + '\n' : '')).join('\n');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob(['﻿' + head + body], { type: 'text/plain;charset=utf-8' }));
+    a.download = 'clase_' + d.toISOString().slice(0, 10) + '_' + hhmmss(d).replace(/:/g, '') + '.txt';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+
+  // ---------- Eventos ----------
+  $('btnStart').onclick = () => state.running ? stop() : start();
+  $('btnSwap').onclick = () => {
+    const s = srcKey(), t = tgtKey();
+    $('srcLang').value = t;
+    $('tgtLang').value = s === 'es-ES' ? 'es-MX' : s;
+    onLangChange();
+  };
+  $('srcLang').onchange = onLangChange;
+  $('tgtLang').onchange = onLangChange;
+  $('engine').onchange = () => { savePrefs(); if ($('engine').value !== 'google') getBuiltin(srcKey(), tgtKey(), true); };
+  ['fontSize', 'lines', 'theme', 'showOrig', 'showRuby', 'ovBg', 'ovFont'].forEach(id => $(id).addEventListener('input', applyView));
+  $('liveTrans').onchange = savePrefs;
+  $('btnFloat').onclick = () => toggleFloat();
+  $('btnFull').onclick = () => document.fullscreenElement ? document.exitFullscreen() : stageEl.requestFullscreen();
+  $('btnSave').onclick = saveTranscript;
+  $('btnClear').onclick = () => {
+    if (state.lines.length && !confirm('¿Borrar todos los subtítulos de esta sesión?')) return;
+    state.lines = []; state.interim = { orig: '' }; $('histList').innerHTML = ''; render();
+  };
+  document.addEventListener('keydown', e => {
+    if (['SELECT', 'INPUT', 'BUTTON', 'TEXTAREA', 'A'].includes(e.target.tagName)) return;
+    if (e.code === 'Space') { e.preventDefault(); state.running ? stop() : start(); }
+  });
+
+  if (!SR) setStatus('Este navegador no reconoce voz. Abre la página en <b>Google Chrome</b> o <b>Microsoft Edge</b>.', true);
+  // Solo revisa el ayudante al cargar si esta computadora ya lo usó antes
+  let known = false;
+  try { known = localStorage.getItem('subs-helper-known') === '1'; } catch (e) {}
+  if (known || location.hostname === 'localhost') ping().then(ok => { setAvailable(ok); if (!ok) setChip('Ayudante: cerrado (se abrirá al usar la barra)'); });
+  preloadFor([srcKey(), tgtKey()]);
+  applyView();
+})();
+</script>
+</body>
+</html>
